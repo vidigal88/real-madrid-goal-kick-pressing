@@ -1,163 +1,183 @@
-# Real Madrid Pressing Analysis (Goal Kicks)
+# Real Madrid Goal-Kick Pressing
 
-End-to-end pipeline for analyzing Real Madrid’s defensive pressure during **opponent goal-kick build-ups** using SkillCorner-style tracking data.
+Football analytics project studying how Real Madrid pressed opponents after goal-kick restarts across two seasons.
 
-**Pipeline**: Raw tracking → build-up extraction → features → unsupervised pattern discovery → networks/centrality → visualizations + Streamlit viewer
+This repository is a follow-up to an initial Soccermatics course project developed with two colleagues under Professor David Sumpter. The original version was a first prototype. I later continued the goal-kick detection, feature engineering, clustering, and visualisation work independently to create a larger and more robust analysis.
 
-## What you get
+## Project Summary
 
-- **Extracted build-ups**: ready/kick windows saved as per-build-up parquet files
-- **Features**: 20+ per build-up (pressure, compactness, steering, outcomes, QC)
-- **Patterns**: GMM zones → tokenization → NMF topics → clustering
-- **Networks**: co-pressing partnerships, affinity, centrality, communities
-- **Visualizations**: cluster comparisons/sequences, individual trajectories, pressing networks, heatmaps (saved under `visualizations/`)
-- **Interactive viewer**: `app.py` (Streamlit) to explore build-ups frame-by-frame
+The analysis focuses on **opponent goal kicks against Real Madrid** and asks:
 
-## Data layout (expected)
+- How often do opponents play short or direct from goal kicks?
+- What pressing structures does Real Madrid use against short restarts?
+- Are the same pressing patterns visible across seasons?
+- Can unsupervised learning reveal recurring team behaviours from tracking data?
 
-Place raw data under `data/raw/RealMadrid/`:
+The updated pipeline detected **552 opponent goal-kick build-ups** across two seasons.
 
+Current restart split:
+
+```text
+Short restarts: 486
+Direct restarts: 66
 ```
+
+For the public tactical analysis, the focus is on short restarts, defined as goal kicks where the first reception is within **15 metres** of the kick.
+
+## Key Findings
+
+For short opponent goal kicks, the cluster sequence plots suggest two main Real Madrid pressing behaviours:
+
+- **Cluster 0: controlled high containment**  
+  Real Madrid are already positioned high near the opponent penalty area, but the team shape is more stretched. The first seconds after the kick show structural stability rather than an immediate aggressive jump.
+
+- **Cluster 1: compact high-pressure trap**  
+  Real Madrid are more compact around the ball-side build-up zone, creating a clearer high-intensity trap near the opponent box.
+
+These two behaviours appear in both `2023/2024` and `2024/2025`, suggesting continuity in Real Madrid's pressing approach despite changes in personnel.
+
+Short-restart cluster sizes:
+
+```text
+2023/2024
+Cluster 0: 125
+Cluster 1: 111
+Cluster 2: 3
+Cluster 3: 3
+
+2024/2025
+Cluster 0: 130
+Cluster 1: 112
+Cluster 2: 2
+```
+
+Clusters with very small samples are treated as outliers rather than tactical families.
+
+## Methodology
+
+### Goal-Kick Detection
+
+Goal kicks were detected using a combination of event data and tracking validation.
+
+The event data first identifies candidate moments where the opponent has a `goal_kick_for` restart. Tracking data is then used to validate the scene and kick moment:
+
+- Ball located in or very near the opponent goal area.
+- Kick-like ball movement detected through speed, acceleration, and future displacement.
+- Real Madrid players not repeatedly inside the opponent goal area at the restart moment.
+- Opponent goalkeeper context checked through goalkeeper-ball proximity.
+- Duplicate references to the same kick time removed.
+
+This approach improved the sample from the original prototype to **552 detected build-ups**.
+
+### Restart Classification
+
+Restarts are classified by first-reception distance:
+
+```text
+Short:  first reception < 15m
+Direct: first reception >= 15m
+```
+
+True long restarts, defined as `>= 30m`, are retained as a descriptive sub-label but are rare in this dataset.
+
+### Pressing Pattern Discovery
+
+The clustering is based on Real Madrid's pressing movements, not manual labels.
+
+Pipeline:
+
+1. Normalize pitch direction so the opponent always builds from left to right.
+2. Identify active Real Madrid pressers based on repeated proximity to the ball carrier.
+3. Sample presser positions around `kick + 1s` and `kick + 5s`.
+4. Map those positions into data-driven pitch zones using Gaussian Mixture Models.
+5. Convert each pressing movement into a zone-transition token.
+6. Build a token matrix representing each goal-kick build-up.
+7. Apply NMF topic modelling to identify recurring pressing motifs.
+8. Cluster build-ups by their NMF topic profiles.
+
+Model settings used in the current version:
+
+```text
+Goal-kick build-ups: 552
+Movement tokens: 120
+NMF topics: 8
+Clusters: 4
+Silhouette score: 0.229
+```
+
+The decision to use **8 topics** and **4 clusters** prioritised interpretability and tactical readability over creating many small groups.
+
+## Visualisations
+
+The main public visuals are the `cluster_sequence_*` plots for short restarts, split by season.
+
+Each sequence plot shows:
+
+- Real Madrid average player positions.
+- Opponent average player positions.
+- Average ball position.
+- Team convex hulls.
+- The number of goal kicks contributing to each timestamp.
+
+Important interpretation note:
+
+> Player and ball positions are cluster averages at each timestamp.
+
+The first frame is labelled **Goal-kick setup**. Subsequent frames show `Kick + 2s`, `Kick + 4s`, and so on. Later timestamps may use fewer goal kicks because not every saved tracking window extends to `+8s` or `+10s`.
+
+## Repository Structure
+
+```text
+main.py                    # Pipeline runner for features/models/visualisations
+src/extract/               # Goal-kick detection and build-up extraction
+src/features/              # Feature engineering
+src/models/                # GMM zones, tokenisation, NMF topics, clustering
+src/analysis/              # Analysis helpers
+src/viz/                   # Plot generation
+notebooks/                 # Exploratory notebooks
+visualizations/            # Generated public visual outputs
+```
+
+## Data Availability
+
+The raw and processed tracking/event data are **not included** in this repository due to data licensing restrictions.
+
+The code is provided to document the methodology and analysis workflow. To reproduce the full pipeline, compatible event and tracking data with the expected structure are required.
+
+Expected local data structure:
+
+```text
 data/raw/RealMadrid/
 ├── meta/{game_id}.json
 ├── dynamic/{game_id}.parquet
-└── tracking_parquet/{game_id}.parquet   # preferred
-# or: tracking/{game_id}.json            # can be converted and optionally cached
+└── tracking_parquet/{game_id}.parquet
 ```
 
-## Quick start
+The `data/` folder is intentionally excluded from version control.
 
-### 1) Install (minimal)
+## Example Commands
 
-This repo currently doesn’t ship pinned `requirements.txt`. Create an environment and install the core packages used by the code:
-
-```bash
-python -m venv .venv
-
-# Windows (PowerShell)
-.\.venv\Scripts\Activate.ps1
-
-# macOS/Linux
-source .venv/bin/activate
-
-python -m pip install -U pip
-python -m pip install pandas numpy pyarrow scikit-learn scipy networkx matplotlib seaborn plotly streamlit pillow tqdm
-```
-
-### 2) Extract build-up windows
-
-Run the extractor from the repo root:
+If compatible data is available locally, the main steps are:
 
 ```bash
 python src/extract/extraction.py --full --verbose
 
-# or specific matches
-python src/extract/extraction.py 2014987 2016604 --verbose
+python -m src.features.feature_engineering \
+  --processed-root data/processed/rm_pressing \
+  --out-dir data/processed/rm_pressing_features \
+  --verbose
 
-# custom paths
-python src/extract/extraction.py --data-root data/raw/RealMadrid --out-dir data/processed/rm_pressing --full
-```
-
-This writes:
-
-```
-data/processed/rm_pressing/
-├── index.parquet
-├── params.json
-└── frames/build_up_*.parquet
-```
-
-### 3) Generate features/models/visualizations
-
-`main.py` runs **feature engineering → modeling → visualization** (it assumes extraction already ran).
-
-```bash
-python main.py
-
-# Skip parts if needed
-python main.py --skip-models
-python main.py --skip-viz
-```
-
-Or run steps individually:
-
-```bash
-python -m src.features.feature_engineering --processed-root data/processed/rm_pressing --out-dir data/processed/rm_pressing_features --verbose
 python -m src.models.gmm_zones
 python -m src.models.tokenization
-python -m src.models.nmf_topics --n-topics 15
-python -m src.models.clustering --n-clusters 5
+python -m src.models.nmf_topics --n-topics 8
+python -m src.models.clustering --n-clusters 4
 python -m src.viz.generate_all --out-dir visualizations
 ```
 
-### 4) Launch the viewer
+## Notes
 
-```bash
-streamlit run app.py
-```
-
-Defaults:
-- processed build-ups: `data/processed/rm_pressing`
-- features: `data/processed/rm_pressing_features`
-- raw data: `data/raw/RealMadrid`
-
-## Outputs (where to look)
-
-```
-data/processed/rm_pressing_features/features.parquet
-data/processed/rm_pressing_tokens/
-data/processed/rm_pressing_topics/
-visualizations/ShortKicks/
-visualizations/LongKicks/
-```
-
-Notable generated files under each visualization subset:
-- `pressure_network_*.png` (full team, frequent players, affinity-weighted, centrality)
-- `centrality_metrics.csv`
-- `cluster_comparison_*.png`, `cluster_sequence_*.png`
-- `individual_{trigger|support1|support2|blocker}_*.png`
-
-## Definitions used in code (important)
-
-There are two related but different concepts:
-
-1) **Frame-level “under pressure”** (features)
-- Ball carrier is inferred as the closest opponent to the ball within a radius (`PossessionConfig.possession_radius_m`, default `8.0m`).
-- A frame is “under pressure” if the nearest RM defender to the **ball carrier** satisfies either:
-  - `dist <= 3.0m`, **or**
-  - `dist <= 5.0m` **and** closing speed `>= 1.0 m/s`
-
-See `src/features/services/possession.py` and `src/features/services/pressure.py` (config in `src/features/config.py`).
-
-2) **“Active pressers”** (pressing networks / affinity / centrality)
-- For each frame with a detected ball carrier, rank defending players by distance to the carrier.
-- Take the **top K closest** (default `K=5`) and count how many frames each defender appears in that top-K set.
-- A player is an “active presser” if they appear in top-K for at least `min_frames` (default `10`).
-
-See `src/models/gmm_zones.py` (`identify_pressers`) and `src/models/config.py`.
-
-## Project layout
-
-```
-app.py                     # Streamlit viewer
-main.py                    # E2E runner (features/models/viz; extraction is separate)
-scripts/doc_generator.py   # Docs/code-reference generator
-src/extract/               # Extraction (goal-kick build-up windows)
-src/features/              # Feature engineering
-src/models/                # GMM zones, tokenization, NMF topics, clustering
-src/analysis/              # Network centrality + reporting
-src/viz/                   # PNG/CSV generation (networks, sequences, trajectories)
-docs/                      # Technical docs + interpretation guides
-visualizations/            # Example outputs (generated)
-```
-
-## Docs
-
-Start here:
-- `docs/README.md` (documentation index)
-- `docs/pipeline-guide/full_pipeline.md` (end-to-end data flow)
-- `docs/visualization-guide/README.md` (how to interpret plots)
+This is an ongoing project. The current public version focuses on team-level pressing structures from short goal kicks. Player-role analysis, such as first presser, support presser, and channel blocker identification, is intentionally left for a future phase.
 
 ## License
 
-MIT (see `LICENSE`).
+MIT License. See `LICENSE`.
