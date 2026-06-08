@@ -1,5 +1,8 @@
 # Data
-data/
+data/*
+!data/
+!data/.gitkeep
+!data/README.md
 
 # Python
 __pycache__/
@@ -54,4 +57,3 @@ Thumbs.db
 *.tmp
 *.bak
 *.log
-
