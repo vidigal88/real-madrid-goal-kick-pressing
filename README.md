@@ -134,6 +134,7 @@ src/features/              # Feature engineering
 src/models/                # GMM zones, tokenisation, NMF topics, clustering
 src/analysis/              # Analysis helpers
 src/viz/                   # Plot generation
+data.example/              # Template for the private local data layout
 notebooks/                 # Exploratory notebooks
 visualizations/            # Generated public visual outputs
 ```
@@ -144,16 +145,22 @@ The raw and processed tracking/event data are **not included** in this repositor
 
 The code is provided to document the methodology and analysis workflow. To reproduce the full pipeline, compatible event and tracking data with the expected structure are required.
 
+Use `data.example/` as a template for the local private data folder.
+
 Expected local data structure:
 
 ```text
-data/raw/RealMadrid/
-├── meta/{game_id}.json
-├── dynamic/{game_id}.parquet
-└── tracking_parquet/{game_id}.parquet
+data/
+├── raw/
+│   └── RealMadrid/
+│       ├── meta/{game_id}.json
+│       ├── dynamic/{game_id}.parquet
+│       └── tracking_parquet/{game_id}.parquet
+├── interim/
+└── processed/
 ```
 
-The `data/` folder is intentionally excluded from version control.
+The `data/` folder is intentionally excluded from version control. Do not commit raw data, processed data, model artifacts derived from licensed data, or compressed data archives.
 
 ## Example Commands
 
