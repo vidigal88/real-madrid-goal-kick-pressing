@@ -134,18 +134,18 @@ src/features/              # Feature engineering
 src/models/                # GMM zones, tokenisation, NMF topics, clustering
 src/analysis/              # Analysis helpers
 src/viz/                   # Plot generation
-data.example/              # Template for the private local data layout
+data/                      # Local-only data scaffold; real files are gitignored
 notebooks/                 # Exploratory notebooks
 visualizations/            # Generated public visual outputs
 ```
 
 ## Data Availability
 
-The raw and processed tracking/event data are **not included** in this repository due to data licensing restrictions.
+The underlying event and tracking data come from **SkillCorner**. Raw SkillCorner data and processed files derived from it are **not included** in this repository due to data licensing restrictions.
 
 The code is provided to document the methodology and analysis workflow. To reproduce the full pipeline, compatible event and tracking data with the expected structure are required.
 
-Use `data.example/` as a template for the local private data folder.
+The repository includes only a safe `data/` scaffold (`data/README.md` and `data/.gitkeep`). Real local data should be placed inside `data/`, but should never be committed.
 
 Expected local data structure:
 
@@ -160,7 +160,7 @@ data/
 └── processed/
 ```
 
-The `data/` folder is intentionally excluded from version control. Do not commit raw data, processed data, model artifacts derived from licensed data, or compressed data archives.
+The `.gitignore` is configured so real files inside `data/` are ignored. Do not commit raw SkillCorner data, processed parquet files, model artifacts derived from licensed data, or compressed data archives.
 
 ## Example Commands
 
